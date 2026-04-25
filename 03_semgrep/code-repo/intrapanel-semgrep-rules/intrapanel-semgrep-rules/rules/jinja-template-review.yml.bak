@@ -1,0 +1,36 @@
+rules:
+  - id: intrapanel.jinja2.xss.autoescape-disabled-or-safe-filter
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Jinja2 output escaping is disabled or bypassed with |safe. Only use this for trusted, sanitized HTML.
+    metadata:
+      category: security
+      confidence: HIGH
+      cwe: "CWE-79: Cross-site Scripting"
+      owasp: "A03:2021 Injection"
+      technology: [jinja2, flask]
+    paths:
+      include:
+        - "templates/**/*.html"
+        - "**/templates/**/*.html"
+    pattern-either:
+      - pattern: "{% autoescape false %}"
+      - pattern: "{{ ... | safe }}"
+      - pattern: "{{ ...|safe }}"
+
+  - id: intrapanel.jinja2.xss.manual-review-variable-output
+    languages: [generic]
+    severity: INFO
+    message: >-
+      Template variable output. Flask/Jinja2 autoescapes .html templates by default, so this is usually safe; review only if autoescape is disabled, Markup is used, or the value is inserted into JavaScript/URL/CSS contexts.
+    metadata:
+      category: audit
+      confidence: LOW
+      cwe: "CWE-79: Cross-site Scripting"
+      technology: [jinja2, flask]
+    paths:
+      include:
+        - "templates/**/*.html"
+        - "**/templates/**/*.html"
+    pattern: "{{ $VAR }}"

@@ -1,0 +1,138 @@
+rules:
+  - id: intrapanel.python.flask-debug-exposed
+    languages: [python]
+    severity: ERROR
+    message: >-
+      Flask debug mode is enabled, especially on 0.0.0.0. Do not expose the interactive debugger in deployed environments.
+    metadata:
+      category: security
+      confidence: HIGH
+      cwe: "CWE-489: Active Debug Code"
+      owasp: "A05:2021 Security Misconfiguration"
+      technology: [python, flask]
+    pattern-either:
+      - pattern: app.run(debug=True, host="0.0.0.0", ...)
+      - pattern: app.run(host="0.0.0.0", debug=True, ...)
+      - pattern: $APP.run(debug=True, ...)
+
+  - id: intrapanel.python.ssrf.requests-config-or-request-url
+    languages: [python]
+    severity: ERROR
+    mode: taint
+    message: >-
+      A configurable or request-controlled URL reaches requests.*. This can become SSRF; restrict scheme/host with an allowlist and disable redirects where appropriate.
+    metadata:
+      category: security
+      confidence: MEDIUM
+      cwe: "CWE-918: Server-Side Request Forgery"
+      owasp: "A10:2021 Server-Side Request Forgery"
+      technology: [python, requests, flask]
+    pattern-sources:
+      - pattern: request.args.get(...)
+      - pattern: request.form.get(...)
+      - pattern: request.values.get(...)
+      - pattern: request.get_json(...)
+      - pattern: $CFG.get(...)
+    pattern-sinks:
+      - pattern: requests.get($URL, ...)
+      - pattern: requests.post($URL, ...)
+      - pattern: requests.put($URL, ...)
+      - pattern: requests.request($METHOD, $URL, ...)
+
+  - id: intrapanel.python.weak-password-hash-md5
+    languages: [python]
+    severity: ERROR
+    message: >-
+      MD5 is used for hashing. For passwords, use werkzeug.security.generate_password_hash, bcrypt, scrypt, or Argon2 with salts and work factors.
+    metadata:
+      category: security
+      confidence: HIGH
+      cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+      owasp: "A02:2021 Cryptographic Failures"
+      technology: [python]
+    pattern-either:
+      - pattern: hashlib.md5(...)
+      - pattern: md5(...)
+
+  - id: intrapanel.python.predictable-security-token-random
+    languages: [python]
+    severity: ERROR
+    message: >-
+      random.* is used to generate a token or secret. Use secrets.token_urlsafe(), secrets.choice(), or os.urandom-backed APIs for security tokens.
+    metadata:
+      category: security
+      confidence: HIGH
+      cwe: "CWE-338: Use of Cryptographically Weak Pseudo-Random Number Generator"
+      owasp: "A02:2021 Cryptographic Failures"
+      technology: [python]
+    pattern-either:
+      - patterns:
+          - pattern-inside: |
+              def $FUNC(...):
+                ...
+          - pattern: random.choice(...)
+          - metavariable-regex:
+              metavariable: $FUNC
+              regex: (?i).*(token|secret|key|session|nonce).*
+      - patterns:
+          - pattern-inside: |
+              $TOKEN = ...
+              ...
+          - pattern: random.$RANDOM(...)
+          - metavariable-regex:
+              metavariable: $TOKEN
+              regex: (?i).*(token|secret|key|session|nonce).*
+
+  - id: intrapanel.python.paramiko-autoaddpolicy
+    languages: [python]
+    severity: WARNING
+    message: >-
+      Paramiko AutoAddPolicy accepts unknown host keys and permits SSH MITM. Use load_system_host_keys() and RejectPolicy()/WarningPolicy with explicit trust.
+    metadata:
+      category: security
+      confidence: HIGH
+      cwe: "CWE-295: Improper Certificate Validation"
+      owasp: "A02:2021 Cryptographic Failures"
+      technology: [python, paramiko]
+    pattern: $CLIENT.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+  - id: intrapanel.python.flask-route-post-without-csrf-review
+    languages: [python]
+    severity: WARNING
+    message: >-
+      POST route found. Verify that CSRF protection is enabled globally or that this route has an equivalent CSRF control.
+    metadata:
+      category: audit
+      confidence: LOW
+      cwe: "CWE-352: Cross-Site Request Forgery"
+      owasp: "A01:2021 Broken Access Control"
+      technology: [python, flask]
+    patterns:
+      - pattern: '@app.route($PATH, methods=[..., "POST", ...])'
+      - pattern-not-inside: |
+          csrf = CSRFProtect(app)
+          ...
+
+  - id: intrapanel.requirements.vulnerable-pinned-dependencies
+    languages: [generic]
+    severity: WARNING
+    message: >-
+      Known-old pinned dependency version. Confirm with pip-audit/osv-scanner and upgrade to a currently supported version.
+    metadata:
+      category: security
+      confidence: MEDIUM
+      cwe: "CWE-1104: Use of Unmaintained Third Party Components"
+      owasp: "A06:2021 Vulnerable and Outdated Components"
+      technology: [python, requirements]
+    paths:
+      include:
+        - "requirements.txt"
+        - "**/requirements.txt"
+    pattern-either:
+      - pattern: "Flask==0.12.4"
+      - pattern: "Werkzeug==0.15.5"
+      - pattern: "Jinja2==2.11.3"
+      - pattern: "requests==2.19.1"
+      - pattern: "PyYAML==5.1"
+      - pattern: "Pillow==8.0.0"
+      - pattern: "paramiko==2.4.1"
