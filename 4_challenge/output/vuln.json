@@ -1,0 +1,5 @@
+{
+  "vuln_type": "stack_buffer_overflow",
+  "location": "main (FUN_00401264) @ 0x401264, __strcpy_chk call at 0x401382",
+  "cause": "User input read via fgets (up to 128 bytes) is copied via __strcpy_chk into a 16-byte stack buffer, but the length check (strlen(input)-1 < 100) allows up to 100 characters, far exceeding the destination capacity."
+}
